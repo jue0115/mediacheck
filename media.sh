@@ -39,16 +39,21 @@ function Test_Netflix() {
    local result2=$(echo $tmpresult2 | grep -oP '"isDisplayable":\K(true|false)' | head -n 1)
    if [[ "$result1" == "false" ]] && [[ "$result2" == "false" ]]; then
       echo -n -e "\r Netflix$useNICNF: Originals Only \n"
+      return 0
    elif [ -z "$result1" ] && [ -z "$result2" ]; then
       echo -n -e "\r Netflix$useNICNF: No \n"
+      return 0
    elif [[ "$result1" == "true" ]]; then
       local region1=$(echo $tmpresult1 | grep -oP '"requestCountry":{.*"id":"\K\w\w' | head -n 1)
       echo -n -e "\r Netflix$useNICNF: $region1 \n"
+      return 1
    elif [[ "$result2" == "true" ]]; then
       local region2=$(echo $tmpresult2 | grep -oP '"requestCountry":{.*"id":"\K\w\w' | head -n 1)
       echo -n -e "\r Netflix$useNICNF: $region2 \n"
+      return 1
    else
       echo -n -e "\r Netflix$useNICNF: Failed (Network Connection) \n"
+      return 0
    fi
 }
 
@@ -66,7 +71,7 @@ function Test_Disney() {
 
    if [ -n "$isBanned" ] || [ -n "$is403" ];then
       echo -n -e "\r Disney$useNICDS: 403-No \n"
-      return;
+      return 0
    fi
 
    local fakecontent=$(curl $useNICDS -s --max-time 10 "https://raw.githubusercontent.com/lmc999/RegionRestrictionCheck/main/cookies" | sed -n '8p')
@@ -78,26 +83,26 @@ function Test_Disney() {
 
    if [[ "$tmpresult" == "curl"* ]];then
       echo -n -e "\r Disney$useNICDS: Failed (Network Connection) \n"
-      return;
+      return 0
    fi
 
    local region2=$(echo $tmpresult | python -m json.tool 2> /dev/null | grep 'countryCode' | cut -f4 -d'"')
    local inSupportedLocation=$(echo $tmpresult | python -m json.tool 2> /dev/null | grep 'inSupportedLocation' | awk '{print $2}' | cut -f1 -d',')
    if [ -n "$region2" ] && [[ "$inSupportedLocation" == "true" ]];then
       echo -n -e "\r Disney$useNICDS: $region2 \n"
-      return;
+      return 1
    elif [ -n "$region2" ] && [[ "$inSupportedLocation" == "false" ]] && [ -z "$isUnabailable" ];then
       echo -n -e "\r Disney$useNICDS: $region2 Soon \n"
-      return;
+      return 1
    elif [ -n "$region2" ] && [ -n "$isUnabailable" ];then
       echo -n -e "\r Disney$useNICDS: No \n"
-      return;
+      return 0
    elif [ -z "$region2" ];then
       echo -n -e "\r Disney$useNICDS: No \n"
-      return;
+      return 0
    else
       echo -n -e "\r Disney$useNICDS: Failed \n"
-      return;
+      return 0
    fi
 }
 
@@ -105,12 +110,12 @@ function Test_Google() {
    local GG_result=$(curl $useNICYB --user-agent "${UA_Browser}" --max-time 10 -sSL -H "Accept-Language: en" -b "YSC=ZyA1G52eg5M; VISITOR_PRIVACY_METADATA=CgJERRIA; CONSENT=PENDING+115; SOCS=CAISOAgDEitib3FfaWRlbnRpdHlmcm9udGVuZHVpc2VydmVyXzIwMjMwOTE3LjA5X3AwGgV6aC1DTiACGgYIgI-uqAY; GPS=1; VISITOR_INFO1_LIVE=H3oPP45EiqU; PREF=f4=4000000&tz=Asia.Shanghai" "https://www.youtube.com/premium" 2>&1)
    if [[ "$GG_result" == "curl"* ]]; then
       echo -n -e "\r Google$useNICYB: Failed(Network Connection) \n"
-      return
+      return 0
    fi
    local isCN=$(echo $GG_result | grep 'www.google.cn')
    if [ -n "$isCN" ]; then
       echo -n -e "\r Google$useNICYB: No(CN) \n"
-      return
+      return 0
    fi
    local isNotAvailable=$(echo $GG_result | grep 'Premium is not available in your country')
    # local region=$(echo $GG_result | grep "countryCode" | sed 's/.*"countryCode"//' | cut -f2 -d'"')
@@ -119,12 +124,13 @@ function Test_Google() {
    # local isAvailable=$(echo $GG_result | grep -i 'ad-free')
    if [ -n "$isNotAvailable" ]; then
       echo -n -e "\r Google$useNICYB: No($region) \n"
-      return
+      return 0
    elif [ -n "$region" ]; then
       echo -n -e "\r Google$useNICYB: $region \n"
-      return
+      return 1
    else
       echo -n -e "\r Google$useNICYB: Failed \n"
+      return 0
    fi
 }
 
@@ -136,123 +142,54 @@ function Test_Openai() {
    # if [ -z "$result1" ] && [ -n "$result2" ] && [ "$result3" != "403" ]; then
    if [ -z "$result1" ] ; then
       echo -n -e "\r OpenAI$useNICAI: $region \n"
+      return 1
    else
       echo -n -e "\r OpenAI$useNICAI: BLOCKED!"
+      return 0
    fi
 }
 
 function Loop() {
-   #Test_Netflix
-   local tmpresult1=$(curl $useNICNF --user-agent "${UA_Browser}" -fsL  --max-time 10 "https://www.netflix.com/title/81280792" 2>&1)
-   local tmpresult2=$(curl $useNICNF --user-agent "${UA_Browser}" -fsL  --max-time 10 "https://www.netflix.com/title/70143836" 2>&1)
-   local result1=$(echo $tmpresult1 | grep -oP '"isDisplayable":\K(true|false)' | head -n 1)
-   local result2=$(echo $tmpresult2 | grep -oP '"isDisplayable":\K(true|false)' | head -n 1)
-   if ! ([[ "$result1" == "true" ]] || [[ "$result2" == "true" ]]); then
-      echo -n -e "\r Netflix$useNICNF失效.更新中 \n"
-      for ((i=1; i<=30;i++))
-      do
-			if [[ ${netname} == "wgcf" ]]; then
-				systemctl restart wg-quick@wgcf
-				sleep 2
-			elif [[ ${netname} == "WARP" ]]; then
-				systemctl restart warp-go
-				sleep 2
-			elif [[ ${netname} == "CloudflareWARP" ]]; then
-				systemctl restart warp-svc
-				sleep 2
-			fi
-         #netflix check
-         local tmpresult3=$(curl $useNICNF --user-agent "${UA_Browser}" -fsL  --max-time 10 "https://www.netflix.com/title/81280792" 2>&1)
-         local tmpresult4=$(curl $useNICNF --user-agent "${UA_Browser}" -fsL  --max-time 10 "https://www.netflix.com/title/70143836" 2>&1)
-         local result3=$(echo $tmpresult3 | grep -oP '"isDisplayable":\K(true|false)' | head -n 1)
-         local result4=$(echo $tmpresult4 | grep -oP '"isDisplayable":\K(true|false)' | head -n 1)
-         if [[ "$result3" == "true" ]]; then   #netflix ok
-            #netflix country
-            local region3=$(echo $tmpresult3 | grep -oP '"requestCountry":{.*"id":"\K\w\w' | head -n 1)
-            echo -n -e "\r 重新获取次数:${i} \n"
-            echo -n -e "\r Netflix$useNICNF: $region3 \n"
-            break;
-         elif [[ "$result4" == "true" ]]; then   #netflix ok
-            #netflix country
-            local region4=$(echo $tmpresult4 | grep -oP '"requestCountry":{.*"id":"\K\w\w' | head -n 1)
-            echo -n -e "\r 重新获取次数:${i} \n"
-            echo -n -e "\r Netflix$useNICNF: $region4 \n"
-            break;
-         elif [[ "$i" == 30 ]];then
-            echo -n -e "\r 老子抓不到ip了,躺平吧 \n"
-            break;
-         fi
-      done
-   else
-      #netflix country
-      if [[ "$result1" == "true" ]]; then
-         local region1=$(echo $tmpresult1 | grep -oP '"requestCountry":{.*"id":"\K\w\w' | head -n 1)
-         echo -n -e "\r Netflix$useNICNF: $region1 \n"
-      elif [[ "$result2" == "true" ]]; then
-         local region2=$(echo $tmpresult2 | grep -oP '"requestCountry":{.*"id":"\K\w\w' | head -n 1)
-         echo -n -e "\r Netflix$useNICNF: $region2 \n"
-      fi
-   fi
+   local max_retries=30
+   local i=1
+   local has_shown_switch_msg=0
 
-   #Test_Disney
-   Test_Disney
+   while [ $i -le $max_retries ]; do
+      Test_Netflix > /dev/null 2>&1
+      local res_nf=$?
+      Test_Google > /dev/null 2>&1
+      local res_google=$?
+      Test_Disney > /dev/null 2>&1
+      local res_disney=$?
 
-   #Test_Google
-   local GG_result1=$(curl $useNICYB --user-agent "${UA_Browser}" --max-time 10 -sSL -H "Accept-Language: en" -b "YSC=ZyA1G52eg5M; VISITOR_PRIVACY_METADATA=CgJERRIA; CONSENT=PENDING+115; SOCS=CAISOAgDEitib3FfaWRlbnRpdHlmcm9udGVuZHVpc2VydmVyXzIwMjMwOTE3LjA5X3AwGgV6aC1DTiACGgYIgI-uqAY; GPS=1; VISITOR_INFO1_LIVE=H3oPP45EiqU; PREF=f4=4000000&tz=Asia.Shanghai" "https://www.youtube.com/premium" 2>&1)
-   if [[ "$GG_result1" == "curl"* ]]; then
-      echo -n -e "\r Google$useNICYB.更新中 \n"
-      for ((i=1; i<=30;i++))
-      do
-			if [[ ${netname} == "wgcf" ]]; then
-				systemctl restart wg-quick@wgcf
-				sleep 2
-			elif [[ ${netname} == "WARP" ]]; then
-				systemctl restart warp-go
-				sleep 2
-			elif [[ ${netname} == "CloudflareWARP" ]]; then
-				systemctl restart warp-svc
-				sleep 2
-			fi
-         #google check
-         local GG_result2=$(curl $useNICYB --user-agent "${UA_Browser}" --max-time 10 -sSL -H "Accept-Language: en" -b "YSC=ZyA1G52eg5M; VISITOR_PRIVACY_METADATA=CgJERRIA; CONSENT=PENDING+115; SOCS=CAISOAgDEitib3FfaWRlbnRpdHlmcm9udGVuZHVpc2VydmVyXzIwMjMwOTE3LjA5X3AwGgV6aC1DTiACGgYIgI-uqAY; GPS=1; VISITOR_INFO1_LIVE=H3oPP45EiqU; PREF=f4=4000000&tz=Asia.Shanghai" "https://www.youtube.com/premium" 2>&1)
-         if [[ "$GG_result2" != "curl"* ]]; then   #google ok
-            #google country
-            local isCN=$(echo $GG_result1 | grep 'www.google.cn')
-            # local region=$(echo $GG_result2 | grep "countryCode" | sed 's/.*"countryCode"//' | cut -f2 -d'"')
-            local region=$(echo $GG_result2 | grep -woP '"INNERTUBE_CONTEXT_GL"\s{0,}:\s{0,}"\K[^"]+')
-
-            if [ -n "$isCN" ]; then
-               echo -n -e "\r 重新获取次数:${i} \n"
-               echo -n -e "\r Google$useNICYB: No(CN) \n"
-               break;
-            elif [ -n "$region" ]; then
-               echo -n -e "\r 重新获取次数:${i} \n"
-               echo -n -e "\r Google$useNICYB: $region \n"
-               break;
-            fi
-         elif [[ "$i" == 30 ]];then
-            echo -n -e "\r 老子抓不到ip了,躺平吧 \n"
-            break;
-         fi
-      done
-   else
-      local isCN=$(echo $GG_result1 | grep 'www.google.cn')
-      if [ -n "$isCN" ]; then
-         echo -n -e "\r Google$useNICYB: No(CN) \n"
-      fi
-      local isNotAvailable=$(echo $GG_result1 | grep 'Premium is not available in your country')
-      local region=$(echo $GG_result1 | grep -woP '"INNERTUBE_CONTEXT_GL"\s{0,}:\s{0,}"\K[^"]+')
-      if [ -n "$isNotAvailable" ]; then
-         echo -n -e "\r Google$useNICYB: No($region) \n"
-      elif [ -n "$region" ]; then
-         echo -n -e "\r Google$useNICYB: $region \n"
+      if [ $((res_nf + res_google + res_disney)) -eq 3 ]; then
+         Test_Netflix
+         Test_Google
+         Test_Disney
+         Test_Openai
+         break
       else
-         echo -n -e "\r Google$useNICYB: Failed \n"
-      fi
-   fi
+         if [ $has_shown_switch_msg -eq 0 ]; then
+            has_shown_switch_msg=1
+            echo -n -e "\r ip失效.更新中...\n"
+         fi
+         # 切换 IP
+         if [[ ${netname} == "wgcf" ]]; then systemctl restart wg-quick@wgcf
+         elif [[ ${netname} == "WARP" ]]; then systemctl restart warp-go
+         elif [[ ${netname} == "CloudflareWARP" ]]; then systemctl restart warp-svc
+         fi
 
-   #Test_Openai
-   Test_Openai
+         sleep 3
+         ((i++))
+      fi
+      
+   done
+
+   if [ $i -gt $max_retries ]; then
+      echo -n -e "\r 老子抓不到ip了,躺平吧 \n"
+   fi
+   
+   
 }
 
 
