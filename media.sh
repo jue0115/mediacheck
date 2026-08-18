@@ -45,11 +45,11 @@ function Test_Netflix() {
       echo -n -e "\r Netflix$useNICNF: No \n"
       return 0
    elif [[ "$result1" == "true" ]]; then
-      local region1=$(echo $tmpresult1 | grep -oP '"requestCountry":{.*"id":"\K\w\w' | head -n 1)
+      local region1=$(echo "$tmpresult1" | grep -oP '"requestCountry":\{[^}]*"id":"\K[A-Za-z]{2}' | head -n 1)
       echo -n -e "\r Netflix$useNICNF: $region1 \n"
       return 1
    elif [[ "$result2" == "true" ]]; then
-      local region2=$(echo $tmpresult2 | grep -oP '"requestCountry":{.*"id":"\K\w\w' | head -n 1)
+      local region2=$(echo "$tmpresult2" | grep -oP '"requestCountry":\{[^}]*"id":"\K[A-Za-z]{2}' | head -n 1)
       echo -n -e "\r Netflix$useNICNF: $region2 \n"
       return 1
    else
