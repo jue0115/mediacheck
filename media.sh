@@ -159,7 +159,7 @@ function Loop() {
       Test_Google
       Test_Disney
       Test_Openai
-      return
+      return 0
    fi
 
    while [ $i -le $max_retries ]; do
