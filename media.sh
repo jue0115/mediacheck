@@ -154,6 +154,14 @@ function Loop() {
    local max_retries=30
    local i=1
 
+   if [[ "$netname" != "wgcf" ]] && [[ "$netname" != "WARP" ]] && [[ "$netname" != "CloudflareWARP" ]]; then
+      Test_Netflix
+      Test_Google
+      Test_Disney
+      Test_Openai
+      return
+   fi
+
    while [ $i -le $max_retries ]; do
       Test_Netflix > /dev/null 2>&1
       local res_nf=$?
