@@ -59,15 +59,21 @@ function Test_Netflix() {
 }
 
 function Test_Disney() {
-   if ! command -v python &> /dev/null; then
-      ln -s /usr/bin/python3 /usr/bin/python
+   local python_cmd
+   if command -v python &> /dev/null; then
+      python_cmd=python
+   elif command -v python3 &> /dev/null; then
+      python_cmd=python3
+   else
+      echo -n -e "\r Disney$useNICDS: Failed (Python not found) \n"
+      return 0
    fi
    local PreAssertion=$(curl "${CURL_OPTS[@]}" $useNICDS --user-agent "${UA_Browser}" -s -X POST "https://disney.api.edge.bamgrid.com/devices" -H "authorization: Bearer ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84" -H "content-type: application/json; charset=UTF-8" -d '{"deviceFamily":"browser","applicationRuntime":"chrome","deviceProfile":"windows","attributes":{}}' 2>&1)
-   local assertion=$(echo $PreAssertion | python -m json.tool 2> /dev/null | grep assertion | cut -f4 -d'"')
+   local assertion=$(echo $PreAssertion | "$python_cmd" -m json.tool 2> /dev/null | grep assertion | cut -f4 -d'"')
    local PreDisneyCookie=$(curl "${CURL_OPTS[@]}" $useNICDS -s "https://raw.githubusercontent.com/lmc999/RegionRestrictionCheck/main/cookies" | sed -n '1p')
    local disneycookie=$(echo $PreDisneyCookie | sed "s/DISNEYASSERTION/${assertion}/g")
    local TokenContent=$(curl "${CURL_OPTS[@]}" $useNICDS --user-agent "${UA_Browser}" -s -X POST "https://disney.api.edge.bamgrid.com/token" -H "authorization: Bearer ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84" -d "$disneycookie")
-   local isBanned=$(echo $TokenContent | python -m json.tool 2> /dev/null | grep 'forbidden-location')
+   local isBanned=$(echo $TokenContent | "$python_cmd" -m json.tool 2> /dev/null | grep 'forbidden-location')
    local is403=$(echo $TokenContent | grep '403 ERROR')
 
    if [ -n "$isBanned" ] || [ -n "$is403" ];then
@@ -76,7 +82,7 @@ function Test_Disney() {
    fi
 
    local fakecontent=$(curl "${CURL_OPTS[@]}" $useNICDS -s "https://raw.githubusercontent.com/lmc999/RegionRestrictionCheck/main/cookies" | sed -n '8p')
-   local refreshToken=$(echo $TokenContent | python -m json.tool 2> /dev/null | grep 'refresh_token' | awk '{print $2}' | cut -f2 -d'"')
+   local refreshToken=$(echo $TokenContent | "$python_cmd" -m json.tool 2> /dev/null | grep 'refresh_token' | awk '{print $2}' | cut -f2 -d'"')
    local disneycontent=$(echo $fakecontent | sed "s/ILOVEDISNEY/${refreshToken}/g")
    local tmpresult=$(curl "${CURL_OPTS[@]}" $useNICDS --user-agent "${UA_Browser}" -X POST -sSL "https://disney.api.edge.bamgrid.com/graph/v1/device/graphql" -H "authorization: ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84" -d "$disneycontent" 2>&1)
    local previewcheck=$(curl "${CURL_OPTS[@]}" $useNICDS -s -o /dev/null -L -w '%{url_effective}\n' "https://disneyplus.com" | grep preview)
@@ -87,8 +93,8 @@ function Test_Disney() {
       return 0
    fi
 
-   local region2=$(echo $tmpresult | python -m json.tool 2> /dev/null | grep 'countryCode' | cut -f4 -d'"')
-   local inSupportedLocation=$(echo $tmpresult | python -m json.tool 2> /dev/null | grep 'inSupportedLocation' | awk '{print $2}' | cut -f1 -d',')
+   local region2=$(echo $tmpresult | "$python_cmd" -m json.tool 2> /dev/null | grep 'countryCode' | cut -f4 -d'"')
+   local inSupportedLocation=$(echo $tmpresult | "$python_cmd" -m json.tool 2> /dev/null | grep 'inSupportedLocation' | awk '{print $2}' | cut -f1 -d',')
    if [ -n "$region2" ] && [[ "$inSupportedLocation" == "true" ]];then
       echo -n -e "\r Disney$useNICDS: $region2 \n"
       return 1
