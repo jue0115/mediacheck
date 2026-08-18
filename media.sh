@@ -36,8 +36,8 @@ fi
 function Test_Netflix() {
    local tmpresult1=$(curl "${CURL_OPTS[@]}" $useNICNF --user-agent "${UA_Browser}" -fsL "https://www.netflix.com/title/81280792" 2>&1)
    local tmpresult2=$(curl "${CURL_OPTS[@]}" $useNICNF --user-agent "${UA_Browser}" -fsL "https://www.netflix.com/title/70143836" 2>&1)
-   local result1=$(echo "$tmpresult1" | grep -oP '"metaData":\{[^}]*"isAvailable":\K(true|false)' | head -n 1)
-   local result2=$(echo "$tmpresult2" | grep -oP '"metaData":\{[^}]*"isAvailable":\K(true|false)' | head -n 1)
+   local result1=$(echo "$tmpresult1" | grep -oP '"metaData":\{[^}]*"isAvailable":\K(true|false)' | tail -n 1)
+   local result2=$(echo "$tmpresult2" | grep -oP '"metaData":\{[^}]*"isAvailable":\K(true|false)' | tail -n 1)
    if [[ "$result1" == "false" ]] && [[ "$result2" == "false" ]]; then
       echo -n -e "\r Netflix$useNICNF: Originals Only \n"
       return 0
@@ -45,11 +45,11 @@ function Test_Netflix() {
       echo -n -e "\r Netflix$useNICNF: No \n"
       return 0
    elif [[ "$result1" == "true" ]]; then
-      local region1=$(echo "$tmpresult1" | grep -oP '"requestCountry":\{[^}]*"id":"\K[A-Za-z]{2}' | head -n 1)
+      local region1=$(echo "$tmpresult1" | grep -oP '"requestCountry":\{[^}]*"id":"\K[A-Za-z]{2}' | tail -n 1)
       echo -n -e "\r Netflix$useNICNF: $region1 \n"
       return 1
    elif [[ "$result2" == "true" ]]; then
-      local region2=$(echo "$tmpresult2" | grep -oP '"requestCountry":\{[^}]*"id":"\K[A-Za-z]{2}' | head -n 1)
+      local region2=$(echo "$tmpresult2" | grep -oP '"requestCountry":\{[^}]*"id":"\K[A-Za-z]{2}' | tail -n 1)
       echo -n -e "\r Netflix$useNICNF: $region2 \n"
       return 1
    else
@@ -87,8 +87,8 @@ function Test_Disney() {
       return 0
    fi
 
-   local region2=$(echo $tmpresult | python -m json.tool 2> /dev/null | grep 'countryCode' | cut -f4 -d'"')
-   local inSupportedLocation=$(echo $tmpresult | python -m json.tool 2> /dev/null | grep 'inSupportedLocation' | awk '{print $2}' | cut -f1 -d',')
+   local region2=$(echo $tmpresult | python -m json.tool 2> /dev/null | grep 'countryCode' | cut -f4 -d'"' | tail -n 1)
+   local inSupportedLocation=$(echo $tmpresult | python -m json.tool 2> /dev/null | grep 'inSupportedLocation' | awk '{print $2}' | cut -f1 -d',' | tail -n 1)
    if [ -n "$region2" ] && [[ "$inSupportedLocation" == "true" ]];then
       echo -n -e "\r Disney$useNICDS: $region2 \n"
       return 1
@@ -121,7 +121,7 @@ function Test_Google() {
    local isNotAvailable=$(echo $GG_result | grep 'Premium is not available in your country')
    # local region=$(echo $GG_result | grep "countryCode" | sed 's/.*"countryCode"//' | cut -f2 -d'"')
    # local isAvailable=$(echo $GG_result | egrep '/month|/.month')
-   local region=$(echo $GG_result | grep -woP '"INNERTUBE_CONTEXT_GL"\s{0,}:\s{0,}"\K[^"]+')
+   local region=$(echo $GG_result | grep -woP '"INNERTUBE_CONTEXT_GL"\s{0,}:\s{0,}"\K[^"]+' | tail -n 1)
    # local isAvailable=$(echo $GG_result | grep -i 'ad-free')
    if [ -n "$isNotAvailable" ]; then
       echo -n -e "\r Google$useNICYB: No($region) \n"
@@ -139,7 +139,7 @@ function Test_Openai() {
    local result1=$(curl "${CURL_OPTS[@]}" $useNICAI -sS "https://chat.openai.com/auth/login" | egrep 'you have been blocked|If you are using a VPN')
    # local result2=$(curl "${CURL_OPTS[@]}" $useNICAI -sI "https://chat.openai.com/auth/login" | grep 'HTTP/2 200')
    local result3=$(curl "${CURL_OPTS[@]}" $useNICAI -fsL --write-out %{http_code} --output /dev/null "https://chat.openai.com/public-api/conversation_limit" 2>&1)
-   local region=$(curl "${CURL_OPTS[@]}" $useNICAI -sS https://chat.openai.com/cdn-cgi/trace | grep "loc=" | awk -F= '{print $2}')
+   local region=$(curl "${CURL_OPTS[@]}" $useNICAI -sS https://chat.openai.com/cdn-cgi/trace | grep "loc=" | awk -F= '{print $2}' | tail -n 1)
    # if [ -z "$result1" ] && [ -n "$result2" ] && [ "$result3" != "403" ]; then
    if [ -z "$result1" ] ; then
       echo -n -e "\r OpenAI$useNICAI: $region \n"
